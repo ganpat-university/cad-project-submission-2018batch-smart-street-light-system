@@ -1,39 +1,56 @@
 var port = process.env.PORT || 3000,
     http = require('http'),
     fs = require('fs'),
-    html = fs.readFileSync('index.html');
+    express = require("express");
 
-var log = function(entry) {
-    fs.appendFileSync('/tmp/sample-app.log', new Date().toISOString() + ' - ' + entry + '\n');
-};
+var bodyParser = require("body-parser");
+var urlencodedParser = bodyParser.urlencoded({extended:false});
+var app = express();
+const sqlite3 = require('sqlite3').verbose();
+    
+app.use(express.static(__dirname + '/public'));
 
-var server = http.createServer(function (req, res) {
-    if (req.method === 'POST') {
-        var body = '';
-
-        req.on('data', function(chunk) {
-            body += chunk;
-        });
-
-        req.on('end', function() {
-            if (req.url === '/') {
-                log('Received message: ' + body);
-            } else if (req.url = '/scheduled') {
-                log('Received task ' + req.headers['x-aws-sqsd-taskname'] + ' scheduled at ' + req.headers['x-aws-sqsd-scheduled-at']);
-            }
-
-            res.writeHead(200, 'OK', {'Content-Type': 'text/plain'});
-            res.end();
-        });
-    } else {
-        res.writeHead(200);
-        res.write(html);
-        res.end();
-    }
+app.get('/',function(req,res){
+    fs.readFile('public/index.html', function(err, data) {
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.write(data);
+      res.end();
+    });
 });
 
-// Listen on port 3000, IP defaults to 127.0.0.1
-server.listen(port);
+app.get('/form01',function(req,res){
+    fs.readFile('public/td.html', function(err, data) {
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.write(data);
+      res.end();
+    });
+});
 
-// Put a friendly message on the terminal
-console.log('Server running at http://127.0.0.1:' + port + '/');
+app.post('/form01',urlencodedParser,function(req,res){ 
+    
+    console.log("\nreq(POST) -> form01");
+  
+    s1 = req.body.date;
+    s2 = req.body.led_data;
+
+    let db = new sqlite3.Database('./SSLDB.db', (err) => {
+      if (err) {
+        console.error(err.message);
+      }
+      console.log('>> Connected to the SSLDB database.');
+      db.run(`INSERT INTO testing (server_datetime,client_datetime,test_result) VALUES(datetime('now'),?,?);`,[s1,s2],function(err) {
+          if (err) {
+            return console.log(err.message);
+          }
+          console.log('>> A row has been inserted with rowid');
+          db.close();
+          console.log('>> Disconnected to the SSLDB database.');
+        });
+    });
+    res.end("</done>");
+});
+
+
+app.listen(port, '0.0.0.0', function() {
+    console.log("server starting");
+  });
